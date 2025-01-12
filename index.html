@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lost WETH Recovery</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to bottom right, #141E30, #243B55);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+            color: white;
+        }
+        .container {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+            padding: 40px;
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+        h1 {
+            color: #FFD700;
+        }
+        .button {
+            background: linear-gradient(to right, #4CAF50, #45a049);
+            color: white;
+            padding: 12px 30px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 0;
+            transition: background 0.3s;
+        }
+        .button:hover {
+            background: linear-gradient(to right, #45a049, #4CAF50);
+        }
+        .button:disabled {
+            background: gray;
+            cursor: not-allowed;
+        }
+        .disclaimer {
+            font-size: 14px;
+            color: #ddd;
+            margin-top: 20px;
+            line-height: 1.6;
+        }
+        .wallet-info, .status-info {
+            margin-top: 20px;
+            font-size: 16px;
+            color: #ddd;
+        }
+        .wallet-info strong, .status-info strong {
+            color: #FFD700;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Lost WETH Recovery</h1>
+        <p>Retrieve your lost Wrapped Ether (WETH) with ease. A small fee applies.</p>
+
+        <button class="button" id="connectMetaMask">Connect MetaMask</button>
+        <button class="button" id="connectCoinbaseWallet">Connect Coinbase Wallet</button>
+        <button class="button" id="connectTrustWallet">Connect Trust Wallet</button>
+        <button class="button" id="connectWalletConnect">Connect via WalletConnect</button>
+        <button class="button" id="disconnectButton" style="display:none;">Disconnect Wallet</button>
+
+        <div class="wallet-info" id="walletInfo" style="display:none;">
+            <p><strong>Connected Wallet:</strong> <span id="connectedWallet">None</span></p>
+        </div>
+
+        <div class="status-info" id="statusInfo" style="display:none;">
+            <p><strong>WETH Balance:</strong> <span id="wethBalance">0</span></p>
+            <p><strong>Pending WETH Transactions:</strong> <span id="pendingTransactions">None</span></p>
+            <p><strong>WETH Dust:</strong> <span id="wethDust">No</span></p>
+            <p><strong>Unclaimed Gas Fees:</strong> <span id="unclaimedFees">0</span></p>
+        </div>
+
+        <div class="disclaimer">
+            <p><strong>Disclaimer:</strong> A 5% fee will be charged for retrieval. Ensure you trust this process.</p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.6.6/dist/umd/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.2.11/dist/web3.min.js"></script>
+
+    <script>
+        let currentAccount = null; // Current connected wallet address
+        let provider = null; // WalletConnect provider
+        const WETH_CONTRACT_ADDRESS = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"; // WETH Contract Address
+
+        async function connectToWallet(walletType) {
+            try {
+                let accounts;
+
+                if (walletType === 'MetaMask' && window.ethereum) {
+                    accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    provider = window.ethereum;
+                } else if (walletType === 'WalletConnect') {
+                    provider = new WalletConnectProvider({
+                        rpc: { 1: "https://rpc.ankr.com/eth" },
+                    });
+                    await provider.enable();
+                    const web3 = new Web3(provider);
+                    accounts = await web3.eth.getAccounts();
+                } else {
+                    alert('Unsupported wallet or wallet not installed.');
+                    return;
+                }
+
+                currentAccount = accounts[0];
+                displayWalletInfo();
+                alert(`${walletType} connected: ${currentAccount}`);
+                await getWalletStatus(currentAccount);
+            } catch (error) {
+                console.error(`Error connecting to ${walletType}:`, error);
+                alert(`Error connecting to ${walletType}: ${error.message || error}`);
+            }
+        }
+
+        async function getWalletStatus(account) {
+            const web3 = new Web3(provider || window.ethereum);
+            const wethContract = new web3.eth.Contract([
+                {
+                    "constant": true,
+                    "inputs": [{ "name": "account", "type": "address" }],
+                    "name": "balanceOf",
+                    "outputs": [{ "name": "", "type": "uint256" }],
+                    "payable": false,
+                    "stateMutability": "view",
+                    "type": "function"
+                }
+            ], WETH_CONTRACT_ADDRESS);
+
+            try {
+                const balance = await wethContract.methods.balanceOf(account).call();
+                const wethBalance = web3.utils.fromWei(balance, 'ether');
+                document.getElementById('wethBalance').innerText = wethBalance;
+                document.getElementById('pendingTransactions').innerText = "Simulated Value"; // Placeholder
+                document.getElementById('wethDust').innerText = parseFloat(wethBalance) < 0.0001 ? "Yes" : "No";
+                document.getElementById('unclaimedFees').innerText = "Simulated Value"; // Placeholder
+                document.getElementById('statusInfo').style.display = 'block';
+            } catch (error) {
+                console.error('Error fetching wallet status:', error);
+            }
+        }
+
+        function displayWalletInfo() {
+            document.getElementById('walletInfo').style.display = 'block';
+            document.getElementById('connectedWallet').innerText = currentAccount;
+            document.getElementById('disconnectButton').style.display = 'inline-block';
+            updateConnectButtons();
+        }
+
+        function disconnectWallet() {
+            currentAccount = null;
+            provider?.disconnect?.(); // Disconnect WalletConnect
+            location.reload();
+        }
+
+        function updateConnectButtons() {
+            document.querySelectorAll('.button').forEach(button => {
+                if (button.id.startsWith('connect')) {
+                    button.disabled = !!currentAccount;
+                }
+            });
+        }
+
+        document.getElementById('connectMetaMask').addEventListener('click', () => connectToWallet('MetaMask'));
+        document.getElementById('connectWalletConnect').addEventListener('click', () => connectToWallet('WalletConnect'));
+        document.getElementById('disconnectButton').addEventListener('click', disconnectWallet);
+    </script>
+</body>
+</html>
